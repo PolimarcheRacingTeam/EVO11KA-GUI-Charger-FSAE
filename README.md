@@ -36,8 +36,8 @@ Sviluppata dal **Polimarche Racing Team** per test, diagnostica e tuning del sis
                       │  
                       │  Formato messaggi seriali:
                       │  • Regex pattern per frame CAN
-                      │  • Es: "CanBus Rx 0x618 12 34 56 78 9A BC DE F0"
-                      |        "CanBus Tx 0x610 AA BB CC DD"
+                      │  • Es: "CanBus Rx 0x610 12 34 56 78 9A BC DE F0"
+                      |        "CanBus Tx 0x618 AA BB CC DD"
                       │
                       ▼
        ┌──────────────────────────────────────┐
