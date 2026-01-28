@@ -113,6 +113,7 @@ class MainWindow(QMainWindow):
         toolbar_layout.addWidget(QLabel("Baudrate:"))
         self.baudrate_combo = QComboBox()
         self.baudrate_combo.setMinimumWidth(150)
+        self.baudrate_combo.setEditable(True)
         self.baudrate_combo.addItems([str(b) for b in serial.Serial.BAUDRATES])
         self.baudrate_combo.setCurrentIndex(16)         #imposta 115200 predefinito
         toolbar_layout.addWidget(self.baudrate_combo)
