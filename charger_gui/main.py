@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
         self.refresh_ports()
 
     def setup_ui(self):
-        """Setup interfaccia utente"""
+        """Setup user interface"""
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -182,7 +182,7 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
 
     def refresh_ports(self):
-        """Aggiorna elenco porte seriali (COM) disponibili/aperte"""
+        """Refresh available serial ports (COM) list"""
         self.port_combo.clear()
         ports = list_serial_ports()
         if ports:
@@ -191,7 +191,7 @@ class MainWindow(QMainWindow):
             self.port_combo.addItem("No ports found")
 
     def toggle_connection(self):
-        """Apre/Chiude la connessione con la porta seriale selezionata"""
+        """Open/Close connection with selected serial port"""
         if not self.serial_handler.running:
             # Connect
             port = self.port_combo.currentText()
@@ -218,7 +218,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(SerialMessage)
     def on_message_received(self, msg: SerialMessage):
-        """Handle ha ricevuto un messaggio CAN"""
+        """Handle received CAN message"""
 
         decoded = CANDecoder.decode_message(msg.can_id, msg.data)
 
@@ -258,7 +258,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(bool, str)
     def on_connection_status(self, connected: bool, message: str):
-        """Handle.connection_status è cambiato"""
+        """Handle connection status changed"""
         if connected:
             self.status_bar.showMessage(f"Connected: {message}")
         else:
@@ -266,7 +266,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str)
     def on_error(self, error_msg: str):
-        """Handle messaggio di errore"""
+        """Handle error message"""
         self.status_bar.showMessage(f"ERROR: {error_msg}")
         QMessageBox.warning(self, "Communication Error", error_msg)
 
@@ -281,7 +281,7 @@ class MainWindow(QMainWindow):
                           "<p>Version 1.0</p>"
                           "<p>Monitor and control EVO Charger via CAN Bus over serial connection.</p>"
                           "<p>Supports 4 levels of CAN messages:</p>"
-                          "<ul>"    #elenco
+                          "<ul>"    
                           "<li>Level 1: Control & Real-time Diagnostic</li>"
                           "<li>Level 2: Faults & Information</li>"
                           "<li>Level 3: Service Messages</li>"

@@ -1,5 +1,6 @@
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QScrollArea, QFrame, QPushButton)
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, 
+                              QFrame, QPushButton, QLabel, QGridLayout, QMessageBox)
 from PyQt6.QtCore import Qt
 from .widgets import (ParameterDisplay, BooleanIndicator, GroupPanel, 
                       MessageInfoPanel, FaultListWidget, RawDataDisplay)
@@ -14,13 +15,29 @@ class Level1Tab(QWidget):
     def setup_ui(self):
         main_layout = QVBoxLayout()
         
+        # Info banner at the top
+        info_banner = QLabel("Level 1 - Real-time Control & Diagnostics | Monitor charger operational status and parameters")
+        info_banner.setStyleSheet("""
+            QLabel {
+                color: #1976D2;
+                background-color: #E3F2FD;
+                padding: 10px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: bold;
+                border-left: 4px solid #1976D2;
+            }
+        """)
+        info_banner.setWordWrap(True)
+        main_layout.addWidget(info_banner)
+        
         # Scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll_content = QWidget()
         layout = QVBoxLayout(scroll_content)
 
-        #CTL Panel - Control Packet (ID 0x618)
+        # CTL Panel - Control Packet (ID 0x618)
         self.ctl_panel = GroupPanel("CTL - Control messages (100ms) - TX")
         self.ctl_info = MessageInfoPanel()
         self.ctl_can = BooleanIndicator("CanBus Enable", "green", "red")
@@ -64,10 +81,25 @@ class Level1Tab(QWidget):
         self.stat_bulks = BooleanIndicator("Bulk Error", "red", "gray")
         self.stat_raw = RawDataDisplay()
         
+        # Info label for errorLatch
+        self.error_latch_info = QLabel("INFO: When 'Failure Occurred' is active, check Level 2 tab for fault details")
+        self.error_latch_info.setStyleSheet("""
+            QLabel {
+                color: #FF9800;
+                background-color: #FFF3E0;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+        """)
+        self.error_latch_info.setVisible(False)
+        
         self.stat_panel.add_widget(self.stat_info)
         self.stat_panel.add_separator()
         self.stat_panel.add_widget(self.stat_power_enable)
         self.stat_panel.add_widget(self.stat_error_latch)
+        self.stat_panel.add_widget(self.error_latch_info)
         self.stat_panel.add_widget(self.stat_warn_limit)
         self.stat_panel.add_widget(self.stat_lim_temp)
         self.stat_panel.add_widget(self.stat_warning_hv)
@@ -178,6 +210,9 @@ class Level1Tab(QWidget):
         self.stat_warning_hv.set_state(packet.warning_hv)
         self.stat_bulks.set_state(packet.bulks)
         self.stat_raw.update_data(raw_data)
+        
+        # Show/hide info message based on errorLatch state
+        self.error_latch_info.setVisible(packet.error_latch)
     
     def update_act2(self, packet: Act2Packet, can_id: int, raw_data: list):
         """Update ACT2 display"""
@@ -213,10 +248,65 @@ class Level1Tab(QWidget):
 class Level2Tab(QWidget):
     def __init__(self):
         super().__init__()
+        self.total_faults = 0
+        self.active_faults = 0
+        self.passive_faults = 0
         self.setup_ui()
     
     def setup_ui(self):
         main_layout = QVBoxLayout()
+        
+        # Status summary at the top
+        summary_frame = QFrame()
+        summary_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        summary_layout = QHBoxLayout(summary_frame)
+        summary_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Summary title
+        summary_title = QLabel("Fault Summary")
+        summary_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        summary_layout.addWidget(summary_title)
+        
+        summary_layout.addStretch()
+        
+        # Fault counters
+        self.total_faults_label = QLabel("Total: 0")
+        self.total_faults_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.total_faults_label.setStyleSheet("color: #333; padding: 5px 10px; background-color: #e0e0e0; border-radius: 3px;")
+        summary_layout.addWidget(self.total_faults_label)
+        
+        self.active_faults_label = QLabel("Active: 0")
+        self.active_faults_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.active_faults_label.setStyleSheet("color: white; padding: 5px 10px; background-color: #f44336; border-radius: 3px;")
+        summary_layout.addWidget(self.active_faults_label)
+        
+        self.passive_faults_label = QLabel("Passive: 0")
+        self.passive_faults_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.passive_faults_label.setStyleSheet("color: white; padding: 5px 10px; background-color: #ff9800; border-radius: 3px;")
+        summary_layout.addWidget(self.passive_faults_label)
+        
+        # Status indicator
+        self.status_indicator = QLabel("● System OK")
+        self.status_indicator.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        self.status_indicator.setStyleSheet("color: #4CAF50; padding: 5px 15px;")
+        summary_layout.addWidget(self.status_indicator)
+        
+        main_layout.addWidget(summary_frame)
+        
+        # Info banner about automatic fault reporting
+        info_banner = QLabel("INFO: Fault details are automatically requested by the microcontroller when errors are detected")
+        info_banner.setStyleSheet("""
+            QLabel {
+                color: #1976D2;
+                background-color: #E3F2FD;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 10px;
+                border-left: 4px solid #1976D2;
+            }
+        """)
+        info_banner.setWordWrap(True)
+        main_layout.addWidget(info_banner)
         
         # Scroll area
         scroll = QScrollArea()
@@ -227,42 +317,72 @@ class Level2Tab(QWidget):
         #  Fault Panel 
         self.fault_panel = GroupPanel("FAULT - Active/Passive Faults - RX")
         self.fault_info = MessageInfoPanel()
-        self.clear_faults_button = QPushButton("Clear Faults")
-        self.clear_faults_button.setStyleSheet("background-color: blue; color: white;")
+        
+        # Button controls in horizontal layout
+        button_layout = QHBoxLayout()
+        self.clear_faults_button = QPushButton("Clear All Faults")
+        self.clear_faults_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:pressed {
+                background-color: #0D47A1;
+            }
+        """)
         self.clear_faults_button.setMaximumWidth(200)
+        self.clear_faults_button.clicked.connect(self._clear_faults_with_confirmation)
+        button_layout.addWidget(self.clear_faults_button)
+        button_layout.addStretch()
+        
         self.fault_list = FaultListWidget()
-        self.clear_faults_button.clicked.connect(self.fault_list.clear_faults)
         self.fault_raw = RawDataDisplay()
         
         self.fault_panel.add_widget(self.fault_info)
-        self.fault_panel.add_widget(self.clear_faults_button)
+        self.fault_panel.layout.addLayout(button_layout)
         self.fault_panel.add_widget(self.fault_list)
         self.fault_panel.add_widget(self.fault_raw)
         
-        #  Software Version Panel 
-        self.sw_panel = GroupPanel("SOFTWARE - Software Version - RX")
-        self.sw_info = MessageInfoPanel()
-        self.sw_version = ParameterDisplay("Software Version", "", 0)
+        #  Info Panel (Software Version & Serial Number in grid) 
+        self.info_panel = GroupPanel("DEVICE INFO - Software & Serial Number - RX")
+        info_grid = QGridLayout()
+        
+        # Software Version
+        sw_label = QLabel(" Software Version:")
+        sw_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.sw_version_value = QLabel("N/A")
+        self.sw_version_value.setFont(QFont("Arial", 10))
+        self.sw_version_value.setStyleSheet("color: #2196F3; padding: 5px;")
+        info_grid.addWidget(sw_label, 0, 0)
+        info_grid.addWidget(self.sw_version_value, 0, 1)
+        
+        # Serial Number
+        sn_label = QLabel("Serial Number:")
+        sn_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.sn_number_value = QLabel("N/A")
+        self.sn_number_value.setFont(QFont("Arial", 10))
+        self.sn_number_value.setStyleSheet("color: #4CAF50; padding: 5px;")
+        info_grid.addWidget(sn_label, 1, 0)
+        info_grid.addWidget(self.sn_number_value, 1, 1)
+        
+        info_grid.setColumnStretch(1, 1)
+        self.info_panel.layout.addLayout(info_grid)
+        
+        # Raw data displays for SW and SN
         self.sw_raw = RawDataDisplay()
-        
-        self.sw_panel.add_widget(self.sw_info)
-        self.sw_panel.add_widget(self.sw_version)
-        self.sw_panel.add_widget(self.sw_raw)
-        
-        #  Serial Number Panel 
-        self.sn_panel = GroupPanel("SERIAL - Serial Number - RX")
-        self.sn_info = MessageInfoPanel()
-        self.sn_number = ParameterDisplay("Serial Number", "", 0)
         self.sn_raw = RawDataDisplay()
-        
-        self.sn_panel.add_widget(self.sn_info)
-        self.sn_panel.add_widget(self.sn_number)
-        self.sn_panel.add_widget(self.sn_raw)
         
         # Add panels
         layout.addWidget(self.fault_panel)
-        layout.addWidget(self.sw_panel)
-        layout.addWidget(self.sn_panel)
+        layout.addWidget(self.info_panel)
         layout.addStretch()
         
         scroll.setWidget(scroll_content)
@@ -271,7 +391,8 @@ class Level2Tab(QWidget):
     
     def update_fault(self, packet: FaultPacket, can_id: int, raw_data: list):
         """Update Fault display"""
-        msg_name = "FLTA - Active Fault" if can_id == 0x61D else "FLTP - Passive Fault"
+        is_active = can_id == 0x61D
+        msg_name = "FLTA - Active Fault" if is_active else "FLTP - Passive Fault"
         self.fault_info.update_info(can_id, msg_name)
         
         if packet:  # Non "No Fault Detected"
@@ -289,24 +410,70 @@ class Level2Tab(QWidget):
             self.fault_list.clear_faults()
         
         self.fault_raw.update_data(raw_data)
+        self._update_fault_counters()
     
     def update_software(self, packet: SoftwarePacket, can_id: int, raw_data: list):
-        self.sw_info.update_info(can_id, "SW - Software Version")
-        from PyQt6.QtWidgets import QLabel
-        if not hasattr(self, 'sw_version_label'):
-            self.sw_version_label = QLabel()
-            self.sw_panel.add_widget(self.sw_version_label)
-        self.sw_version_label.setText(f"Version: {packet.version}")
+        """Update Software Version display"""
+        self.sw_version_value.setText(f"v{packet.version}")
         self.sw_raw.update_data(raw_data)
     
     def update_serial(self, packet: SerialNumberPacket, can_id: int, raw_data: list):
-        self.sn_info.update_info(can_id, "SN - Serial Number")
-        from PyQt6.QtWidgets import QLabel
-        if not hasattr(self, 'sn_number_label'):
-            self.sn_number_label = QLabel()
-            self.sn_panel.add_widget(self.sn_number_label)
-        self.sn_number_label.setText(f"Serial: {packet.serial}")
+        """Update Serial Number display"""
+        self.sn_number_value.setText(packet.serial)
         self.sn_raw.update_data(raw_data)
+    
+    def _clear_faults_with_confirmation(self):
+        """Clear faults with confirmation dialog"""
+        if self.fault_list.get_fault_count() == 0:
+            QMessageBox.information(
+                self,
+                "No Faults",
+                "There are no faults to clear."
+            )
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            "Clear Faults",
+            f"Are you sure you want to clear all {self.fault_list.get_fault_count()} fault(s)?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.fault_list.clear_faults()
+            self._update_fault_counters()
+            QMessageBox.information(
+                self,
+                "Faults Cleared",
+                "All faults have been cleared successfully."
+            )
+    
+    def _update_fault_counters(self):
+        """Update fault counter displays"""
+        total = self.fault_list.get_fault_count()
+        active = self.fault_list.get_active_fault_count()
+        passive = total - active
+        
+        self.total_faults = total
+        self.active_faults = active
+        self.passive_faults = passive
+        
+        # Update labels
+        self.total_faults_label.setText(f"Total: {total}")
+        self.active_faults_label.setText(f"Active: {active}")
+        self.passive_faults_label.setText(f"Passive: {passive}")
+        
+        # Update status indicator
+        if total == 0:
+            self.status_indicator.setText("● System OK")
+            self.status_indicator.setStyleSheet("color: #4CAF50; padding: 5px 15px; font-weight: bold;")
+        elif active > 0:
+            self.status_indicator.setText("● Active Faults Detected")
+            self.status_indicator.setStyleSheet("color: #f44336; padding: 5px 15px; font-weight: bold;")
+        else:
+            self.status_indicator.setText("● Passive Faults Only")
+            self.status_indicator.setStyleSheet("color: #ff9800; padding: 5px 15px; font-weight: bold;")
     
     @staticmethod
     def get_fault_name(code: int) -> str:
@@ -341,6 +508,46 @@ class Level3Tab(QWidget):
     
     def setup_ui(self):
         main_layout = QVBoxLayout()
+        
+        # Summary frame at the top
+        summary_frame = QFrame()
+        summary_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        summary_layout = QHBoxLayout(summary_frame)
+        summary_layout.setContentsMargins(10, 10, 10, 10)
+        
+        summary_title = QLabel("Service Diagnostics")
+        summary_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        summary_layout.addWidget(summary_title)
+        summary_layout.addStretch()
+        
+        # Temperature status
+        self.temp_status_label = QLabel("Temp: --°C")
+        self.temp_status_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.temp_status_label.setStyleSheet("color: #333; padding: 5px 10px; background-color: #e0e0e0; border-radius: 3px;")
+        summary_layout.addWidget(self.temp_status_label)
+        
+        # Current status
+        self.current_status_label = QLabel("AC Current: --A")
+        self.current_status_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.current_status_label.setStyleSheet("color: #333; padding: 5px 10px; background-color: #e0e0e0; border-radius: 3px;")
+        summary_layout.addWidget(self.current_status_label)
+        
+        main_layout.addWidget(summary_frame)
+        
+        # Info banner
+        info_banner = QLabel("Level 3 - Service Messages | Detailed temperature monitoring and AC phase diagnostics")
+        info_banner.setStyleSheet("""
+            QLabel {
+                color: #1976D2;
+                background-color: #E3F2FD;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 10px;
+                border-left: 4px solid #1976D2;
+            }
+        """)
+        info_banner.setWordWrap(True)
+        main_layout.addWidget(info_banner)
         
         # Scroll area
         scroll = QScrollArea()
@@ -443,9 +650,12 @@ class Level3Tab(QWidget):
         self.act3_iacm1.set_value(packet.iacm1_A)
         self.act3_iacm2.set_value(packet.iacm2_A)
         self.act3_iacm3.set_value(packet.iacm3_A)
-        total = packet.iacm1_A + packet.iacm2_A + packet.iacm3_A
-        self.act3_total.set_value(total)
+        total_current = packet.iacm1_A + packet.iacm2_A + packet.iacm3_A
+        self.act3_total.set_value(total_current)
         self.act3_raw.update_data(raw_data)
+        
+        # Update summary
+        self.current_status_label.setText(f"AC Current: {total_current:.1f}A")
     
     def update_temp(self, packet: TempPacket, can_id: int, raw_data: list):
         """Update TEMP display"""
@@ -457,6 +667,11 @@ class Level3Tab(QWidget):
         max_temp = max(packet.temp_power1_C, packet.temp_power2_C, packet.temp_power3_C)
         self.temp_max.set_value(max_temp)
         self.temp_raw.update_data(raw_data)
+        
+        # Update summary with color coding
+        temp_color = "#4CAF50" if max_temp < 60 else "#FF9800" if max_temp < 80 else "#f44336"
+        self.temp_status_label.setText(f"Max Temp: {max_temp:.1f}°C")
+        self.temp_status_label.setStyleSheet(f"color: white; padding: 5px 10px; background-color: {temp_color}; border-radius: 3px; font-weight: bold;")
     
     def update_stst1(self, packet: Stst1Packet, can_id: int, raw_data: list):
         """Update STST1 display"""
@@ -487,10 +702,45 @@ class Level3Tab(QWidget):
 class Level4Tab(QWidget):
     def __init__(self):
         super().__init__()
+        self.config_received = False
         self.setup_ui()
     
     def setup_ui(self):
         main_layout = QVBoxLayout()
+        
+        # Summary frame at the top
+        summary_frame = QFrame()
+        summary_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        summary_layout = QHBoxLayout(summary_frame)
+        summary_layout.setContentsMargins(10, 10, 10, 10)
+        
+        summary_title = QLabel("Charger Configuration")
+        summary_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        summary_layout.addWidget(summary_title)
+        summary_layout.addStretch()
+        
+        # Config status
+        self.config_status_label = QLabel("Waiting for configuration...")
+        self.config_status_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.config_status_label.setStyleSheet("color: white; padding: 5px 10px; background-color: #FF9800; border-radius: 3px;")
+        summary_layout.addWidget(self.config_status_label)
+        
+        main_layout.addWidget(summary_frame)
+        
+        # Info banner
+        info_banner = QLabel("Level 4 - Configuration | Charger settings sent once at startup")
+        info_banner.setStyleSheet("""
+            QLabel {
+                color: #1976D2;
+                background-color: #E3F2FD;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 10px;
+                border-left: 4px solid #1976D2;
+            }
+        """)
+        info_banner.setWordWrap(True)
+        main_layout.addWidget(info_banner)
         
         # Scroll area
         scroll = QScrollArea()
@@ -502,7 +752,6 @@ class Level4Tab(QWidget):
         self.tst2_panel = GroupPanel("TST2 - Charger Configuration - RX (once at the startup)")
         self.tst2_info = MessageInfoPanel()
         
-        from PyQt6.QtWidgets import QLabel
         self.tst2_comm_title = QLabel("Communication Settings")
         font = QFont()
         font.setBold(True)
@@ -569,6 +818,12 @@ class Level4Tab(QWidget):
     def update_tst2(self, packet: Tst2Packet, can_id: int, raw_data: list):
         """Update TST2 display"""
         self.tst2_info.update_info(can_id, "TST2 - Configuration")
+        
+        # Update config status
+        if not self.config_received:
+            self.config_received = True
+            self.config_status_label.setText("Configuration Received")
+            self.config_status_label.setStyleSheet("color: white; padding: 5px 10px; background-color: #4CAF50; border-radius: 3px; font-weight: bold;")
         
         # Communication
         baudrate_str = {

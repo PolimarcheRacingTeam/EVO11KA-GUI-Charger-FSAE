@@ -168,6 +168,7 @@ class FaultListWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.faults = []
+        self.fault_info = []  # Store fault metadata
         self.setup_ui()
     
     def setup_ui(self):
@@ -180,7 +181,7 @@ class FaultListWidget(QWidget):
         font.setPointSize(11)
         title.setFont(font)
         
-        # Area per i "fault"
+        # Fault area
         self.fault_container = QVBoxLayout()
         
         # Label "no faults"
@@ -201,27 +202,63 @@ class FaultListWidget(QWidget):
             self.fault_container.removeWidget(self.no_fault_label)
             self.no_fault_label.hide()
         
-        fault_widget = QGroupBox(f"Fault 0x{fault_code:02X}: {fault_name}")
-        fault_layout = QVBoxLayout()
-
-        details = QLabel(
-            f"Occurrences: {occurrence}\n"
-            f"Level: {failure_level}\n"
-            f"Last: {last_time_h}h ago"
-        )
-
-        if "HARD" in failure_level.upper():
-            fault_widget.setStyleSheet("border: 2px solid red;")
-        elif "SOFT" in failure_level.upper():
-            fault_widget.setStyleSheet("border: 2px solid orange;")
+        # Store fault metadata (check if already exists)
+        fault_key = (fault_code, fault_name)
+        existing_index = None
+        for i, info in enumerate(self.fault_info):
+            if (info['code'], info['name']) == fault_key:
+                existing_index = i
+                break
+        
+        if existing_index is not None:
+            # Update existing fault
+            self.fault_info[existing_index].update({
+                'occurrence': occurrence,
+                'level': failure_level,
+                'last_time_h': last_time_h
+            })
+            # Update widget display
+            fault_widget = self.faults[existing_index]
+            fault_widget.setTitle(f"Fault 0x{fault_code:02X}: {fault_name}")
+            details_label = fault_widget.findChild(QLabel)
+            if details_label:
+                details_label.setText(
+                    f"Occurrences: {occurrence}\n"
+                    f"Level: {failure_level}\n"
+                    f"Last: {last_time_h}h ago"
+                )
         else:
-            fault_widget.setStyleSheet("border: 2px solid yellow;")
-        
-        fault_layout.addWidget(details)
-        fault_widget.setLayout(fault_layout)
-        
-        self.fault_container.addWidget(fault_widget)
-        self.faults.append(fault_widget)
+            # Add new fault
+            self.fault_info.append({
+                'code': fault_code,
+                'name': fault_name,
+                'occurrence': occurrence,
+                'level': failure_level,
+                'last_time_h': last_time_h,
+                'is_active': 'HARD' in failure_level.upper()  # Assume HARD = active
+            })
+            
+            fault_widget = QGroupBox(f"Fault 0x{fault_code:02X}: {fault_name}")
+            fault_layout = QVBoxLayout()
+
+            details = QLabel(
+                f"Occurrences: {occurrence}\n"
+                f"Level: {failure_level}\n"
+                f"Last: {last_time_h}h ago"
+            )
+
+            if "HARD" in failure_level.upper():
+                fault_widget.setStyleSheet("border: 2px solid red;")
+            elif "SOFT" in failure_level.upper():
+                fault_widget.setStyleSheet("border: 2px solid orange;")
+            else:
+                fault_widget.setStyleSheet("border: 2px solid yellow;")
+            
+            fault_layout.addWidget(details)
+            fault_widget.setLayout(fault_layout)
+            
+            self.fault_container.addWidget(fault_widget)
+            self.faults.append(fault_widget)
     
     def clear_faults(self):
         for fault in self.faults:
@@ -229,8 +266,17 @@ class FaultListWidget(QWidget):
             fault.deleteLater()
         
         self.faults.clear()
+        self.fault_info.clear()
         self.no_fault_label.show()
         self.fault_container.addWidget(self.no_fault_label)
+    
+    def get_fault_count(self) -> int:
+        """Return the total number of faults"""
+        return len(self.fault_info)
+    
+    def get_active_fault_count(self) -> int:
+        """Return the number of active (HARD) faults"""
+        return sum(1 for fault in self.fault_info if fault.get('is_active', False))
 
 
 class RawDataDisplay(QWidget):
@@ -246,7 +292,7 @@ class RawDataDisplay(QWidget):
         # Titolo
         title = QLabel("Raw CAN Data")
         
-        # Label per i dati
+        # Data label
         self.data_label = QLabel("---")
         self.data_label.setFont(QFont("Courier New", 10))
         self.data_label.setStyleSheet("background-color: #f0f0f0;color: black; padding: 5px;")

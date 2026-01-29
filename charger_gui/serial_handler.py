@@ -6,11 +6,15 @@ import serial.tools.list_ports
 
 
 class SerialMessage:
-    def __init__(self, direction: str, can_id: int, data: List[int], raw: str):
-        self.direction = direction  # "Rx" o "Tx"
+    def __init__(self, can_id: int, data: List[int], direction: str = "RX", raw: str = ""):
+        self.direction = direction  # "RX" o "TX"
         self.can_id = can_id
         self.data = data
-        self.raw = raw
+        self.raw = raw if raw else self._format_raw()
+    
+    def _format_raw(self):
+        data_hex = ' '.join(f'{b:02X}' for b in self.data)
+        return f"CanBus {self.direction} 0x{self.can_id:03X} {data_hex}"
     
     def __repr__(self):
         data_hex = ' '.join(f'{b:02X}' for b in self.data)
@@ -18,9 +22,9 @@ class SerialMessage:
 
 
 class SerialHandler(QThread):
-    """Thread per gestire la comunicazione seriale"""
+    """Thread to handle serial communication"""
     
-    # Segnali PyQt
+    # PyQt Signals
     message_received = pyqtSignal(SerialMessage)
     connection_status = pyqtSignal(bool, str)  # (connected, message)
     error_occurred = pyqtSignal(str)
@@ -42,12 +46,12 @@ class SerialHandler(QThread):
         )
     
     def set_port(self, port_name: str, baudrate: int = 115200):
-        """Imposta porta seriale e baudrate"""
+        """Set serial port and baudrate"""
         self.port_name = port_name
         self.baudrate = baudrate
     
     def connect(self) -> bool:
-        """Connette alla porta seriale"""
+        """Connect to serial port"""
         try:
             if self.serial_port and self.serial_port.is_open:
                 self.serial_port.close()
@@ -67,7 +71,7 @@ class SerialHandler(QThread):
             return False
     
     def disconnect(self):
-        """Disconnette dalla porta seriale"""
+        """Disconnect from serial port"""
         self.running = False
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.close()
@@ -83,11 +87,11 @@ class SerialHandler(QThread):
     
     def parse_message(self, line: str) -> Optional[SerialMessage]:
         """
-        Verifica che sia una RE attesa
-        Analizza una riga ricevuta dalla seriale
+        Verify if it's an expected RE
+        Parse a line received from serial
         
-        Formato atteso: "CanBus Rx/Tx {ID} {Contenuto}"
-        Esempi:
+        Expected format: "CanBus Rx/Tx {ID} {Content}"
+        Examples:
             "CanBus Rx 0x618 12 34 56 78 9A BC DE F0"
             "CanBus Tx 610 AA BB CC DD EE FF"
         """
@@ -99,10 +103,10 @@ class SerialHandler(QThread):
         data_str = match.group(3).strip()
         
         try:
-            # Converti ID (può essere hex o decimale)
+            # Convert ID (can be hex or decimal)
             can_id = int(can_id_str, 16)
             
-            # Converti dati (separati da spazi)
+            # Convert data (space separated)
             data_bytes = [int(b, 16) for b in data_str.split()]
             
             return SerialMessage(direction, can_id, data_bytes, line)
@@ -112,7 +116,7 @@ class SerialHandler(QThread):
             return None
     
     def run(self):
-        """Thread principale per lettura seriale"""
+        """Main thread for serial reading"""
         self.running = True
         buffer = ""
         
@@ -122,23 +126,23 @@ class SerialHandler(QThread):
                 continue
             
             try:
-                # Legge dalla seriale
+                # Read from serial
                 if self.serial_port.in_waiting > 0:         #in buffer
                     data = self.serial_port.read(self.serial_port.in_waiting)
                     buffer += data.decode('utf-8', errors='ignore')
                     
-                    # Processa righe complete e separate
+                    # Process complete lines separated by newline
                     while '\n' in buffer:
                         line, buffer = buffer.split('\n', 1)
                         line = line.strip()
                         
                         if line:
-                            # Analizza il messaggio
+                            # Parse the message
                             msg = self.parse_message(line)
                             if msg:
                                 self.message_received.emit(msg)
                 
-                self.msleep(10)  # Piccola pausa per non sovraccaricare CPU
+                self.msleep(10)  # Small pause to avoid CPU overload
                 
             except serial.SerialException as e:
                 self.error_occurred.emit(f"Errore lettura: {e}")
@@ -148,13 +152,13 @@ class SerialHandler(QThread):
                 self.error_occurred.emit(f"Errore inaspettato: {e}")
     
     def stop(self):
-        """Ferma il thread"""
+        """Stop the thread"""
         self.running = False
         self.disconnect()
         self.wait()
 
 
 def list_serial_ports() -> List[str]:
-    """Restituisce lista delle porte seriali disponibili (aperte)"""
+    """Return list of available (open) serial ports"""
     ports = serial.tools.list_ports.comports()
     return [port.device for port in ports]

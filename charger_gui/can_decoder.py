@@ -93,12 +93,12 @@ class IDSettingType(Enum):
 
 
 # ============================================================================
-# Livello 1 - Struttura Dati
+# Level 1 - Data Structures
 # ============================================================================
 
 @dataclass
 class CtlPacket:
-    """Pacchetto CTL (BMS → Charger) - ID 0x618"""
+    """CTL Packet (BMS → Charger) - ID 0x618"""
     can_enable: bool
     led3_enable: bool
     iac_max_A: float
@@ -108,7 +108,7 @@ class CtlPacket:
 
 @dataclass
 class StatPacket:
-    """Pacchetto STAT (Charger → BMS) - ID 0x610"""
+    """STAT Packet (Charger → BMS) - ID 0x610"""
     power_enable: bool
     error_latch: bool
     warn_limit: bool
@@ -119,7 +119,7 @@ class StatPacket:
 
 @dataclass
 class Act1Packet:
-    """Pacchetto ACT1 (Charger → BMS) - ID 0x611"""
+    """ACT1 Packet (Charger → BMS) - ID 0x611"""
     iac_A: float
     temp_C: float
     vout_V: float
@@ -128,7 +128,7 @@ class Act1Packet:
 
 @dataclass
 class Act2Packet:
-    """Pacchetto ACT2 (Charger → BMS) - ID 0x614"""
+    """ACT2 Packet (Charger → BMS) - ID 0x614"""
     temp_loglv_C: float
     ac_power_kW: float
     prox_limit_A: float
@@ -137,7 +137,7 @@ class Act2Packet:
 
 @dataclass
 class Tst1Packet:
-    """Pacchetto TST1 (Charger → BMS) - ID 0x615"""
+    """TST1 Packet (Charger → BMS) - ID 0x615"""
     # Byte 0
     ack: bool
     pr_compl: bool
@@ -176,12 +176,12 @@ class Tst1Packet:
 
 
 # ============================================================================
-# Livello 2 - Struttura Dati
+# Level 2 - Data Structures
 # ============================================================================
 
 @dataclass
 class ReqPacket:
-    """Pacchetto REQ (BMS → Charger) - ID 0x61B"""
+    """REQ Packet (BMS → Charger) - ID 0x61B"""
     enable: bool
     id_requested: int
 
@@ -212,12 +212,12 @@ class SerialNumberPacket:
 
 
 # ============================================================================
-# Livello 3 - Struttura Dati
+# Level 3 - Data Structures
 # ============================================================================
 
 @dataclass
 class Act3Packet:
-    """Pacchetto ACT3 (Charger → BMS) - ID 0x712"""
+    """ACT3 Packet (Charger → BMS) - ID 0x712"""
     fan_voltage_V: float
     iacm1_A: float
     iacm2_A: float
@@ -226,7 +226,7 @@ class Act3Packet:
 
 @dataclass
 class TempPacket:
-    """Pacchetto TEMP (Charger → BMS) - ID 0x713"""
+    """TEMP Packet (Charger → BMS) - ID 0x713"""
     temp_loghv_C: float
     temp_power1_C: float
     temp_power2_C: float
@@ -235,7 +235,7 @@ class TempPacket:
 
 @dataclass
 class Stst1Packet:
-    """Pacchetto STST1 (Charger → BMS) - ID 0x715"""
+    """STST1 Packet (Charger → BMS) - ID 0x715"""
     pfc_enable: bool
     log_temp_high: bool
     log_temp_low: bool
@@ -255,7 +255,7 @@ class Stst1Packet:
 
 @dataclass
 class Act4Packet:
-    """Pacchetto ACT4 (Charger → BMS) - ID 0x714"""
+    """ACT4 Packet (Charger → BMS) - ID 0x717"""
     temp_logfan_C: float
     iout1_raw: int
     iout2_raw: int
@@ -263,12 +263,12 @@ class Act4Packet:
 
 
 # ============================================================================
-# Livello 4 - Struttura Dati
+# Level 4 - Data Structures
 # ============================================================================
 
 @dataclass
 class Tst2Packet:
-    """Pacchetto TST2 (Charger → BMS) - ID 0x616"""
+    """TST2 Packet (Charger → BMS) - ID 0x716"""
     baudrate: BaudrateType
     id_type: IdType
     iac_control: IacControlType
