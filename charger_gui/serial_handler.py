@@ -109,7 +109,7 @@ class SerialHandler(QThread):
             # Convert data (space separated)
             data_bytes = [int(b, 16) for b in data_str.split()]
             
-            return SerialMessage(direction, can_id, data_bytes, line)
+            return SerialMessage(can_id, data_bytes, direction, line)
             
         except ValueError as e:
             self.error_occurred.emit(f"Errore parsing: {e} - Riga: {line}")
